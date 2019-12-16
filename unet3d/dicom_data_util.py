@@ -92,10 +92,10 @@ def write_image_data_to_file(image_files, data_storage, truth_storage, image_sha
       continue
     
     scan_data = np.load(scan_file)
-    data_storage.append(scan_data)[np.newaxis]
+    data_storage.append(scan_data[0])[np.newaxis]
 
     mask_data = np.load(mask_file)
-    truth_storage.append(mask_data)[np.newaxis]
+    truth_storage.append(mask_data[0])[np.newaxis]
 
     #data_storage.append(np.asarray(subject_data[:n_channels])[np.newaxis])
     #truth_storage.append(np.asarray(subject_data[n_channels], dtype=truth_dtype)[np.newaxis][np.newaxis])

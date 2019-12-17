@@ -75,9 +75,9 @@ def create_data_file(out_file, n_channels, n_samples, image_shape):
   """
   hdf5_file = tables.open_file(out_file, mode='w')
   filters = tables.Filters(complevel=5, complib='blosc')
-  data_shape = tuple([0, n_channels] + list(image_shape))
-  truth_shape = tuple([0, 1] + list(image_shape))
-  data_storage = hdf5_file.create_earray(hdf5_file.root, 'data', tables.Float32Atom(), shape=data_shape,
+  data_shape = tuple([0] + list(image_shape))
+  truth_shape = tuple([0] + list(image_shape))
+  data_storage = hdf5_file.create_earray(hdf5_file.root, 'data', tables.Int32Atom(), shape=data_shape,
                                          filters=filters, expectedrows=n_samples)
   truth_storage = hdf5_file.create_earray(hdf5_file.root, 'truth', tables.UInt8Atom(), shape=truth_shape,
                                           filters=filters, expectedrows=n_samples)
@@ -86,16 +86,11 @@ def create_data_file(out_file, n_channels, n_samples, image_shape):
 
 def write_image_data_to_file(image_files, data_storage, truth_storage, image_shape, n_channels, 
                              truth_dtype=np.uint8, crop=True):
-  for scan_file in image_files:
-    mask_file = scan_file.replace("scan.3d.", "mask.3d.")
-    if (not os.path.exists(mask_file)):
-      continue
-    
+  for scan_file in image_files:  
+    print("Adding Scan file:", scan_file)  
     scan_data = np.load(scan_file)
-    data_storage.append(scan_data[0])[np.newaxis]
-
-    mask_data = np.load(mask_file)
-    truth_storage.append(mask_data[0])[np.newaxis]
+    data_storage.append(np.expand_dims(scan_data['scan'], axis=0))  #data 
+    truth_storage.append(np.expand_dims(scan_data['mask'], axis=0)) #ground truth
 
     #data_storage.append(np.asarray(subject_data[:n_channels])[np.newaxis])
     #truth_storage.append(np.asarray(subject_data[n_channels], dtype=truth_dtype)[np.newaxis][np.newaxis])

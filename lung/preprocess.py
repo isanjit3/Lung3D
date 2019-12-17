@@ -71,9 +71,8 @@ def pre_process_dicom_files(data_folder, process_folder, overwrite=False ):
             mask = np.dstack(mask_temp[0:8])
 
             #save it to the disk
-            savez_compressed(os.path.join(process_path, "scan.3d." + str(img_count)), img)
-            savez_compressed(os.path.join(process_path, "mask.3d." + str(img_count)), mask)
-
+            savez_compressed(os.path.join(process_path, "scan.3d." + str(img_count)), scan=img, mask=mask)
+            
             img_temp = []
             mask_temp = []
             slice_count = 0

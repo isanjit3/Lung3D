@@ -1,51 +1,60 @@
-#Training model with the dicom files.
+import os
+import glob
+import tensorflow as tf
 
-#data folder path
-DATA_PATH = '/home/sanjit/datasets/lung/'
+from unet3d import dicom_data_util, generator, model, training
+import config
 
-#provides the configuration for the program.
-MIN_BOUND = -1000.0 #Minimum HU value we care about
-MAX_BOUND = 400.0   #Max HU value we care about.
-PIXEL_MEAN = 0.25
-IMG_WIDTH = 512
-IMG_HEIGHT = 512
-IMG_CHANNELS = 8
-IMG_NUM_IMAGES_PER_STUDY = 10
+def main(overwrite=False):
+   
+    #open the pre-processed data file.    
+    data_file_opened = dicom_data_util.open_data_file(config["data_file"])
 
-config = dict()
-config["pool_size"] = (2, 2, 2)  # pool size for the max pooling operations
-config["image_shape"] = (512, 512, 8)  # This determines what shape the images will be cropped/resampled to.
-config["patch_shape"] = None #(64, 64, 64)  # switch to None to train on the whole image
-config["labels"] = (1, 2, 4)  # the label numbers on the input image
-config["n_labels"] = len(config["labels"])
-config["all_modalities"] = ["t1", "t1ce", "flair", "t2"]
-config["training_modalities"] = config["all_modalities"]  # change this if you want to only use some of the modalities
-config["nb_channels"] = len(config["training_modalities"])
-if "patch_shape" in config and config["patch_shape"] is not None:
-    config["input_shape"] = tuple([config["nb_channels"]] + list(config["patch_shape"]))
-else:
-    config["input_shape"] = tuple([config["nb_channels"]] + list(config["image_shape"]))
-config["truth_channel"] = config["nb_channels"]
-config["deconvolution"] = True  # if False, will use upsampling instead of deconvolution
+    if not overwrite and os.path.exists(config["model_file"]):
+        model = training.load_old_model(config["model_file"])
+    else:
+        # instantiate new model
+        model = model.unet_model_3d(input_shape=config["input_shape"],
+                              pool_size=config["pool_size"],
+                              n_labels=config["n_labels"],
+                              initial_learning_rate=config["initial_learning_rate"],
+                              deconvolution=config["deconvolution"])
 
-config["batch_size"] = 2
-config["validation_batch_size"] = 2
-config["n_epochs"] = 500  # cutoff the training after this many epochs
-config["patience"] = 10  # learning rate will be reduced after this many epochs if the validation loss is not improving
-config["early_stop"] = 50  # training will be stopped after this many epochs without the validation loss improving
-config["initial_learning_rate"] = 0.00001
-config["learning_rate_drop"] = 0.5  # factor by which the learning rate will be reduced
-config["validation_split"] = 0.8  # portion of the data that will be used for training
-config["flip"] = False  # augments the data by randomly flipping an axis during
-config["permute"] = True  # data shape must be a cube. Augments the data by permuting in various directions
-config["distort"] = None  # switch to None if you want no distortion
-config["augment"] = config["flip"] or config["distort"]
-config["validation_patch_overlap"] = 0  # if > 0, during training, validation patches will be overlapping
-config["training_patch_start_offset"] = (16, 16, 16)  # randomly offset the first patch index by up to this offset
-config["skip_blank"] = True  # if True, then patches without any target will be skipped
+    # get training and testing generators
+    train_generator, validation_generator, n_train_steps, n_validation_steps = generator.get_training_and_validation_generators(
+        data_file_opened,
+        batch_size=config["batch_size"],
+        data_split=config["validation_split"],
+        overwrite=overwrite,
+        validation_keys_file=config["validation_file"],
+        training_keys_file=config["training_file"],
+        n_labels=config["n_labels"],
+        labels=config["labels"],
+        patch_shape=config["patch_shape"],
+        validation_batch_size=config["validation_batch_size"],
+        validation_patch_overlap=config["validation_patch_overlap"],
+        training_patch_start_offset=config["training_patch_start_offset"],
+        permute=config["permute"],
+        augment=config["augment"],
+        skip_blank=config["skip_blank"],
+        augment_flip=config["flip"],
+        augment_distortion_factor=config["distort"])
 
-config["data_file"] = os.path.abspath("brats_data.h5")
-config["model_file"] = os.path.abspath("tumor_segmentation_model.h5")
-config["training_file"] = os.path.abspath("training_ids.pkl")
-config["validation_file"] = os.path.abspath("validation_ids.pkl")
-config["overwrite"] = False  # If True, will previous files. If False, will use previously written files.
+    # run training
+    training.train_model(model=model,
+                model_file=config["model_file"],
+                training_generator=train_generator,
+                validation_generator=validation_generator,
+                steps_per_epoch=n_train_steps,
+                validation_steps=n_validation_steps,
+                initial_learning_rate=config["initial_learning_rate"],
+                learning_rate_drop=config["learning_rate_drop"],
+                learning_rate_patience=config["patience"],
+                early_stopping_patience=config["early_stop"],
+                n_epochs=config["n_epochs"])
+    
+    #Close the data file.            
+    data_file_opened.close()
+
+if __name__ == "__main__":
+    main(overwrite=config["overwrite"])

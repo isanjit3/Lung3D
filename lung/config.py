@@ -1,3 +1,5 @@
+import os
+
 config = dict()
 config["data_path"] = "/home/sanjit/datasets/lung/"
 config["processed_data_path"] = "/home/sanjit/datasets/lung_processed/"
@@ -17,9 +19,12 @@ config["n_labels"] = len(config["labels"])
 #    config["input_shape"] = tuple([config["nb_channels"]] + list(config["patch_shape"]))
 #else:
 #    config["input_shape"] = tuple([config["nb_channels"]] + list(config["image_shape"]))
+
+config["input_shape"] = tuple([1] + list(config["image_shape"]))
 config["truth_channel"] = 1
 config["deconvolution"] = True  # if False, will use upsampling instead of deconvolut
 
+config["pool_size"] = (2, 2, 2)  # pool size for the max pooling operations
 config["batch_size"] = 2
 config["validation_batch_size"] = 2
 config["n_epochs"] = 500  # cutoff the training after this many epochs

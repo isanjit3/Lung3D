@@ -5,6 +5,11 @@ import tensorflow as tf
 from unet3d import dicom_data_util, generator, model, training
 import config
 
+tf_config = tf.ConfigProto()
+tf_config.gpu_options.allow_growth = True
+tf_config.gpu_options.per_process_gpu_memory_fraction = 0.98
+tf.keras.backend.set_session(tf.Session(config=tf_config))
+
 def main(overwrite=False):
    
     #open the pre-processed data file.    
@@ -18,7 +23,9 @@ def main(overwrite=False):
                               pool_size=config.config["pool_size"],
                               n_labels=config.config["n_labels"],
                               initial_learning_rate=config.config["initial_learning_rate"],
-                              deconvolution=config.config["deconvolution"])
+                              deconvolution=config.config["deconvolution"],
+                              depth=2 # 4 is the default.
+                            )
 
     # get training and testing generators
     train_generator, validation_generator, n_train_steps, n_validation_steps = generator.get_training_and_validation_generators(
@@ -30,7 +37,7 @@ def main(overwrite=False):
         training_keys_file=config.config["training_file"],
         n_labels=config.config["n_labels"],
         labels=config.config["labels"],
-        patch_shape=config.config["patch_shape"],
+        patch_shape= config.config["patch_shape"],
         validation_batch_size=config.config["validation_batch_size"],
         validation_patch_overlap=config.config["validation_patch_overlap"],
         training_patch_start_offset=config.config["training_patch_start_offset"],

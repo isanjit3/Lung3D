@@ -75,9 +75,9 @@ def create_data_file(out_file, n_channels, n_samples, image_shape):
   """
   hdf5_file = tables.open_file(out_file, mode='w')
   filters = tables.Filters(complevel=5, complib='blosc')
-  data_shape = tuple([0] + list(image_shape))
-  truth_shape = tuple([0] + list(image_shape))
-  data_storage = hdf5_file.create_earray(hdf5_file.root, 'data', tables.Int32Atom(), shape=data_shape,
+  data_shape = tuple([0, 1] + list(image_shape))
+  truth_shape = tuple([0, 1] + list(image_shape))
+  data_storage = hdf5_file.create_earray(hdf5_file.root, 'data', tables.Float32Atom(), shape=data_shape,
                                          filters=filters, expectedrows=n_samples)
   truth_storage = hdf5_file.create_earray(hdf5_file.root, 'truth', tables.UInt8Atom(), shape=truth_shape,
                                           filters=filters, expectedrows=n_samples)
@@ -86,17 +86,24 @@ def create_data_file(out_file, n_channels, n_samples, image_shape):
 
 def write_image_data_to_file(image_files, data_storage, truth_storage, image_shape, n_channels, 
                              truth_dtype=np.uint8, crop=True):
+  fileCount = 0                             
   for scan_file in image_files:  
     print("Adding Scan file:", scan_file)  
     scan_data = np.load(scan_file)
-    data_storage.append(np.expand_dims(scan_data['scan'], axis=0))  #data 
-    truth_storage.append(np.expand_dims(scan_data['mask'], axis=0)) #ground truth
+    if (scan_data["data"].shape != image_shape):
+      print("Loaded file has incorrect shape and cannot be loaded. Shape: ", scan_data['data'].shape)
+      continue
+    
+    data_storage.append(scan_data['data'][np.newaxis][np.newaxis])  #data 
+    truth_storage.append(scan_data['truth'][np.newaxis][np.newaxis])
 
-    #data_storage.append(np.asarray(subject_data[:n_channels])[np.newaxis])
-    #truth_storage.append(np.asarray(subject_data[n_channels], dtype=truth_dtype)[np.newaxis][np.newaxis])
+    #data_storage.append(np.expand_dims(scan_data['data'], axis=0))  #data 
+    #truth_storage.append(np.expand_dims(scan_data['truth'], axis=0)) #ground truth
 
-    #add_data_to_storage(data_storage, truth_storage, subject_data, images[0].affine, n_channels,
-    #                    truth_dtype)
+    fileCount += 1
+    print("Total File Count:", fileCount)
+
+    
   return data_storage, truth_storage
 
 def add_data_to_storage(data_storage, truth_storage, subject_data, affine, n_channels, truth_dtype):
@@ -134,7 +141,10 @@ def write_data_to_file(training_data_files, out_file, image_shape, truth_dtype=n
   if subject_ids:
       hdf5_file.create_array(hdf5_file.root, 'subject_ids', obj=subject_ids)
   if normalize:
+      print("Normalizing the data storage")
       normalize_data_storage(data_storage)
+      
+  print("Closing the data storage")
   hdf5_file.close()
   return out_file
 

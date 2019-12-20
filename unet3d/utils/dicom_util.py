@@ -263,6 +263,19 @@ def display_image(im, figsize=None, ax=None):
     ax.get_yaxis().set_visible(False)
     return ax
 
+def get_scan_data(image_path):
+    """
+    Returns the scan image when there is not contour associated with the scan.
+    """
+    slices = get_scan_slices(image_path)
+    img_data = []
+    for s in slices:
+        img_data.append(s.pixel_array)
+
+    np_img = np.asarray(img_data, dtype=np.int16)
+    img_data = reslice_image(np_img, slices)
+    return img_data
+
 def get_scan_and_mask_data(image_path, contour_filename, return_tumor_only_slices = False):
   """
   Returns the Scan and the Mask data in normalized 1x1x1 voxels
@@ -289,6 +302,7 @@ def get_scan_and_mask_data(image_path, contour_filename, return_tumor_only_slice
   #img_data = normalize(img_data, config.config["min_bound"], config.config["max_bound"], config.config["pixel_mean"])
 
   #reslice the image to 1x1x1 voxel
+  print("Reslicing scans to 1x1x1 voxel")
   scan = get_scan_slices(image_path)
   img_data = reslice_image(np_img, scan) 
   mask_data = reslice_image(np_mask, scan)
@@ -317,7 +331,7 @@ def show_img_msk_fromarray(img_arr, msk_arr, alpha=0.35, sz=7, cmap='inferno',
                            save_path=None):
 
     """
-    Show original image and masked on top of image
+    Show original image with mask on top of image
     next to each other in desired size
     Inputs:
         img_arr (np.array): array of the image

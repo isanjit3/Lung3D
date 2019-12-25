@@ -3,11 +3,14 @@ import os
 import nibabel as nib
 import numpy as np
 import tables
+import SimpleITK as sitk
+import cv2
 
 from .training import load_old_model
 from .utils import pickle_load
 from .utils.patches import reconstruct_from_patches, get_patch_from_3d_data, compute_patch_indices
 from .augment import permute_data, generate_permutation_keys, reverse_permute_data
+from unet3d.utils import dicom_util
 
 
 def patch_wise_prediction(model, data, overlap=0, batch_size=1, permute=False):
@@ -116,21 +119,41 @@ def run_validation_case(data_index, output_dir, model, data_file, training_modal
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-
-    affine = data_file.root.affine[data_index]
+    
     test_data = np.asarray([data_file.root.data[data_index]])
-    for i, modality in enumerate(training_modalities):
-        image = nib.Nifti1Image(test_data[0, i], affine)
-        image.to_filename(os.path.join(output_dir, "data_{0}.nii.gz".format(modality)))
+    truth_data = np.asarray([data_file.root.truth[data_index]])
+    """
+    for i in range(0, test_data.shape[0]): #data index
+        for j in range(0, test_data[i].shape[0]): #Number of channels in the data file.
+            for k in range(0, test_data[i][j].shape[2]): # Number of slices in the data file.
+                file_name = f'{k:06}_scan.png'
+                dicom_util.save_img(img_arr = test_data[i, j, :, :, k], 
+                                    save_path=os.path.join(output_dir, file_name))
 
-    test_truth = nib.Nifti1Image(data_file.root.truth[data_index][0], affine)
-    test_truth.to_filename(os.path.join(output_dir, "truth.nii.gz"))
-
+                file_name = f'{k:06}_truth.png'
+                dicom_util.save_img(img_arr = truth_data[i, j, :, :, k], 
+                                    save_path=os.path.join(output_dir, file_name))
+    """
     patch_shape = tuple([int(dim) for dim in model.input.shape[-3:]])
     if patch_shape == test_data.shape[-3:]:
-        prediction = predict(model, test_data, permute=permute)
-    else:
+        prediction = predict(model, test_data, permute=permute) # Do the prediction
+    else:  #Do the patch based prediction
         prediction = patch_wise_prediction(model=model, data=test_data, overlap=overlap, permute=permute)[np.newaxis]
+
+    for i in range(0, prediction.shape[0]): #data index
+        for j in range(0, prediction[i].shape[0]): #Number of channels in the data file.
+            for k in range(0, prediction[i][j].shape[2]): # Number of slices in the data file.
+                file_name = f'{k:06}_prediction.png'
+
+                dicom_util.save_img(img_arr = (test_data[i, j, :, :, k], 
+                                                truth_data[i, j, :, :, k], 
+                                                prediction[i, j, :, :, k]
+                                            ), 
+                                    save_path=os.path.join(output_dir, file_name))
+            break
+                
+
+    """
     prediction_image = prediction_to_image(prediction, affine, label_map=output_label_map, threshold=threshold,
                                            labels=labels)
     if isinstance(prediction_image, list):
@@ -138,7 +161,7 @@ def run_validation_case(data_index, output_dir, model, data_file, training_modal
             image.to_filename(os.path.join(output_dir, "prediction_{0}.nii.gz".format(i + 1)))
     else:
         prediction_image.to_filename(os.path.join(output_dir, "prediction.nii.gz"))
-
+    """
 
 def run_validation_cases(validation_keys_file, model_file, training_modalities, labels, hdf5_file,
                          output_label_map=False, output_dir=".", threshold=0.5, overlap=16, permute=False):
@@ -146,10 +169,7 @@ def run_validation_cases(validation_keys_file, model_file, training_modalities, 
     model = load_old_model(model_file)
     data_file = tables.open_file(hdf5_file, "r")
     for index in validation_indices:
-        if 'subject_ids' in data_file.root:
-            case_directory = os.path.join(output_dir, data_file.root.subject_ids[index].decode('utf-8'))
-        else:
-            case_directory = os.path.join(output_dir, "validation_case_{}".format(index))
+        case_directory = os.path.join(output_dir, "validation_case_{}".format(index))
         run_validation_case(data_index=index, output_dir=case_directory, model=model, data_file=data_file,
                             training_modalities=training_modalities, output_label_map=output_label_map, labels=labels,
                             threshold=threshold, overlap=overlap, permute=permute)

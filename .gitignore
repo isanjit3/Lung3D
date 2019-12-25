@@ -17,3 +17,5 @@ test_dir
 *.hdr
 *.img
 v2.3.2.tar.gz
+prediction/
+model_weights/

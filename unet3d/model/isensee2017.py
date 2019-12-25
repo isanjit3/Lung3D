@@ -19,7 +19,7 @@ def isensee2017_model(input_shape=(4, 128, 128, 128), n_base_filters=16, depth=5
     https://www.cbica.upenn.edu/sbia/Spyridon.Bakas/MICCAI_BraTS/MICCAI_BraTS_2017_proceedings_shortPapers.pdf
 
     This network is highly similar to the model proposed by Kayalibay et al. "CNN-based Segmentation of Medical
-    Imaging Data", 2017: https://arxiv.org/pdf/1701.03056.pdf
+    Imaging Data", 2017: pre
 
 
     :param input_shape:

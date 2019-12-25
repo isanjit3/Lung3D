@@ -327,8 +327,7 @@ def get_roi_names(contour_data):
     roi_seq_names = [roi_seq.ROIName for roi_seq in list(contour_data.StructureSetROISequence)]
     return roi_seq_names
 
-def show_img_msk_fromarray(img_arr, msk_arr, alpha=0.35, sz=7, cmap='inferno',
-                           save_path=None):
+def show_img_msk_fromarray(img_arr, msk_arr, alpha=0.35, sz=7, cmap='inferno', save_path=None):
 
     """
     Show original image with mask on top of image
@@ -340,21 +339,35 @@ def show_img_msk_fromarray(img_arr, msk_arr, alpha=0.35, sz=7, cmap='inferno',
         sz (int): figure size for display
         save_path (str): path to save the figure
     """
-
-    #msk_arr = np.ma.masked_where(msk_arr == 0, msk_arr)
+    
     plt.figure(figsize=(sz, sz))
     plt.subplot(1, 2, 1)
-    plt.imshow(img_arr, cmap='gray')
-    #plt.imshow(msk_arr, cmap=cmap, alpha=alpha)
-    #plt.imshow(msk_arr, cmap='jet', interpolation='none', alpha=None)
-    plt.subplot(1, 2, 2)
-    #plt.imshow(img_arr, cmap='gray')
+    plt.imshow(img_arr, cmap='gray')  
+    
+    plt.subplot(1, 2, 2)    
     plt.imshow(msk_arr, cmap='jet', interpolation='none', alpha=None)
+    
     if save_path is None:
         plt.show()
     else:
         plt.savefig(save_path)
         plt.close()
+
+def save_img(img_arr, save_path):
+    """
+    Saves Numpy array as image to disk.
+    Inputs:
+        img_arr (np.array): Numpy array containing the image data
+        save_path: Path to the image where to save
+    """
+    plt.figure(figsize=(7, 7))
+    cols = len(img_arr)
+    for i in range(0, cols):
+        plt.subplot(1, cols, i+1)
+        plt.imshow(img_arr[i], cmap='gray') 
+
+    plt.savefig(save_path)
+    plt.close()
 
 def reslice_image(image, scan, new_spacing=[1,1,1]):
   """

@@ -40,8 +40,8 @@ def load_old_model(model_file):
                       'weighted_dice_coefficient': weighted_dice_coefficient,
                       'weighted_dice_coefficient_loss': weighted_dice_coefficient_loss}
     try:
-        #from keras_contrib.layers import InstanceNormalization
-        from tensorflow.python.keras.layers  import InstanceNormalization
+        from keras_contrib.layers import InstanceNormalization
+        #from tensorflow.python.keras.layers  import InstanceNormalization
         custom_objects["InstanceNormalization"] = InstanceNormalization
     except ImportError:
         pass

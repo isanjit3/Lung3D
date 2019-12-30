@@ -94,11 +94,8 @@ def write_image_data_to_file(image_files, data_storage, truth_storage, image_sha
       print("Loaded file has incorrect shape and cannot be loaded. Shape: ", scan_data['data'].shape)
       continue
     
-    data_storage.append(scan_data['data'][np.newaxis][np.newaxis])  #data 
+    data_storage.append(scan_data['data'][np.newaxis][np.newaxis])   
     truth_storage.append(scan_data['truth'][np.newaxis][np.newaxis])
-
-    #data_storage.append(np.expand_dims(scan_data['data'], axis=0))  #data 
-    #truth_storage.append(np.expand_dims(scan_data['truth'], axis=0)) #ground truth
 
     fileCount += 1
     print("Total File Count:", fileCount)

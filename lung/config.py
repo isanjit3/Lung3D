@@ -56,5 +56,11 @@ else:
     config["training_file"] = os.path.abspath("lung_training_ids.pkl")
     config["validation_file"] = os.path.abspath("lung_validation_ids.pkl")
 
+config["mask_file"] = os.path.abspath("foregound_mask")
+config["mask_file_img"] = os.path.abspath("foregound_mask.png")
+config["segmented_lung_img"] = os.path.abspath("segmented_lung_img.png")
+config["segmented_lung_img"] = os.path.abspath("segmented_mask_img.png")
+config["cropped_lung_img"] = os.path.abspath("cropped_lung_img.png")
+config["cropped_mask_img"] = os.path.abspath("cropped_mask_img.png")
 
 config["overwrite"] = False  # If True, will previous files. If False, will use previously written files.

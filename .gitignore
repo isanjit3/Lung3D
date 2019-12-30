@@ -19,3 +19,4 @@ test_dir
 v2.3.2.tar.gz
 prediction/
 model_weights/
+prediction_old/

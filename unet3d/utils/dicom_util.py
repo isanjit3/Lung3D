@@ -275,7 +275,7 @@ def display_image(im, figsize=None, ax=None):
     ax.get_yaxis().set_visible(False)
     return ax
 
-def get_scan_data(image_path):
+def get_scan_data(image_path, reslice=False):
     """
     Returns the scan image when there is not contour associated with the scan.
     """
@@ -284,8 +284,10 @@ def get_scan_data(image_path):
     for s in slices:
         img_data.append(s.pixel_array)
 
-    np_img = np.asarray(img_data, dtype=np.int16)
-    img_data = reslice_image(np_img, slices)
+    if reslice:
+        np_img = np.asarray(img_data, dtype=np.int16)
+        img_data = reslice_image(np_img, slices)
+
     return img_data
 
 def get_scan_and_mask_data(image_path, contour_filename, return_tumor_only_slices = False, reslice=False):
@@ -315,8 +317,9 @@ def get_scan_and_mask_data(image_path, contour_filename, return_tumor_only_slice
 
         print("Reslicing scans to 1x1x1 voxel")
         scan = get_scan_slices(image_path)
-        img_data = reslice_image(np_img, scan) 
-        mask_data = reslice_image(np_mask, scan)
+        spacing = np.array([scan[0].SliceThickness] + list(scan[0].PixelSpacing), dtype=np.float32)
+        img_data = reslice_image(np_img, spacing) 
+        mask_data = reslice_image(np_mask, spacing)
 
     if return_tumor_only_slices and (1 in tumor_only_slices):  
         idx = tumor_only_slices.index(1)  
@@ -380,7 +383,7 @@ def save_img(img_arr, save_path):
     plt.savefig(save_path)
     plt.close()
 
-def reslice_image(image, scan, new_spacing=[1,1,1]):
+def reslice_image(image, spacing, new_spacing=[1,1,1]):
     """
     A scan may have a pixel spacing of [2.5, 0.5, 0.5], which means that the distance 
     between slices is 2.5 millimeters. For a different scan this may be [1.5, 0.725, 0.725], 
@@ -392,9 +395,15 @@ def reslice_image(image, scan, new_spacing=[1,1,1]):
 
     Whilst this may seem like a very simple step, it has quite some edge cases due to 
     rounding. Also, it takes quite a while.
+    Inputs:
+        image (np.array): 3D array containing the scan slices
+        spacing: Current slice spacing
+        new_spacing: required spacing between the slices.
+    Returns:
+        Scan slices with the new spacing.
     """
     # Determine current pixel spacing
-    spacing = np.array([scan[0].SliceThickness] + list(scan[0].PixelSpacing), dtype=np.float32)
+    #spacing = np.array([scan[0].SliceThickness] + list(scan[0].PixelSpacing), dtype=np.float32)
 
     resize_factor = spacing / new_spacing
     new_real_shape = image.shape * resize_factor
@@ -560,6 +569,29 @@ def get_crop_size(img, rtol=1e-8):
     start = np.maximum(start - 1, 0)
     end = np.minimum(end + 1, data.shape[:3])
     
-    slices = [slice(s, e) for s, e in zip(start, end)]
+    #slices = [slice(s, e) for s, e in zip(start, end)]
+    slices = [[s, e] for s, e in zip(start, end)]
     
+    for s in slices:
+        if (s[1]-s[0])%2 != 0:
+            s[1] = min(s[1]+1, data.shape[:3][0])
+    
+    w_diff = (slices[0][1] - slices[0][0]) - (slices[1][1] - slices[1][0])
+    h1 = abs(int(w_diff/2))
+    h2 = abs(w_diff) - h1
+    if w_diff > 0: #Second slice is small
+        slices[1][0] = max(slices[1][0] - h1, 0)
+        slices[1][1] = min(slices[1][1] + h2, data.shape[:3][0])
+    elif w_diff < 0:
+        slices[0][0] = max(slices[0][0] - h1, 0)
+        slices[0][1] = min(slices[0][1] + h2, data.shape[:3][0])
+
+    w_diff = (slices[0][1] - slices[0][0]) - (slices[1][1] - slices[1][0])
+    if (w_diff > 0):
+        slices[0][1] = slices[0][1] - w_diff
+    elif w_diff < 0:
+        slices[1][1] = slices[1][1] - w_diff
+
+    #Convert to slice format
+    slices = [slice(s[0], s[1]) for s in slices]
     return slices

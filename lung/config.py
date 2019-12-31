@@ -59,7 +59,7 @@ else:
 config["mask_file"] = os.path.abspath("foregound_mask")
 config["mask_file_img"] = os.path.abspath("foregound_mask.png")
 config["segmented_lung_img"] = os.path.abspath("segmented_lung_img.png")
-config["segmented_lung_img"] = os.path.abspath("segmented_mask_img.png")
+config["segmented_mask_img"] = os.path.abspath("segmented_mask_img.png")
 config["cropped_lung_img"] = os.path.abspath("cropped_lung_img.png")
 config["cropped_mask_img"] = os.path.abspath("cropped_mask_img.png")
 

@@ -1,5 +1,6 @@
 
 import os
+import glob
 import config
 import numpy as np
 from unet3d import dicom_data_util
@@ -30,8 +31,44 @@ def get_model():
     cnn_model.summary()
 
 
+def verify_processed():
+    """
+    verifies if any subject folder is missed to process.
+    """
+    missing_subjects = []
+    subjects = glob.glob(os.path.join(config.config["data_path"], "*"))
+    for s in subjects:
+        process_path = os.path.join(config.config["processed_data_path"], os.path.basename(s))
+        if not os.path.exists(process_path):
+            print(s)
+            missing_subjects.append(s)
+            break
+        
+        f = []
+        for (dirpath, dirnames, filenames) in os.walk(process_path):
+            f.extend(filenames)
 
+        if (len(f) == 0):
+            print(s)
+            missing_subjects.append(s)
+    
+    return missing_subjects
+
+def verify_min_max_values():
+    samples = glob.glob(os.path.join(config.config["processed_data_path"], "*", "*", "scan.*"))      
+    for s in samples:
+        scan_data = np.load(s)  
+        max = scan_data['data'].max()
+        min = scan_data['data'].min()
+        print(min, ", ", max, " :", s)
+
+
+
+
+#-------------------------------------------------
 #call the function to test
 #validate_npz()
 #display_img_from_hdf5()
-get_model()
+#get_model()
+
+verify_min_max_values()

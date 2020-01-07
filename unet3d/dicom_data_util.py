@@ -81,10 +81,11 @@ def create_data_file(out_file, n_channels, n_samples, image_shape):
                                          filters=filters, expectedrows=n_samples)
   truth_storage = hdf5_file.create_earray(hdf5_file.root, 'truth', tables.UInt8Atom(), shape=truth_shape,
                                           filters=filters, expectedrows=n_samples)
-   
-  return hdf5_file, data_storage, truth_storage
+  affine_storage = hdf5_file.create_earray(hdf5_file.root, 'affine', tables.Float32Atom(), shape=(0, 4, 4),
+                                          filters=filters, expectedrows=n_samples) 
+  return hdf5_file, data_storage, truth_storage, affine_storage
 
-def write_image_data_to_file(image_files, data_storage, truth_storage, image_shape, n_channels, 
+def write_image_data_to_file(image_files, data_storage, truth_storage, affine_storage, image_shape, n_channels, 
                              truth_dtype=np.uint8, crop=True):
   fileCount = 0                             
   for scan_file in image_files:  
@@ -96,12 +97,13 @@ def write_image_data_to_file(image_files, data_storage, truth_storage, image_sha
     
     data_storage.append(scan_data['data'][np.newaxis][np.newaxis])   
     truth_storage.append(scan_data['truth'][np.newaxis][np.newaxis])
+    affine_storage.append(scan_data['affine'][np.newaxis])
 
     fileCount += 1
     print("Total File Count:", fileCount)
 
     
-  return data_storage, truth_storage
+  return data_storage, truth_storage, affine_storage
 
 def add_data_to_storage(data_storage, truth_storage, subject_data, affine, n_channels, truth_dtype):
   data_storage.append(np.asarray(subject_data[:n_channels])[np.newaxis])
@@ -124,7 +126,7 @@ def write_data_to_file(training_data_files, out_file, image_shape, truth_dtype=n
   n_channels = 1 #len(training_data_files[0]) - 1
 
   try:
-      hdf5_file, data_storage, truth_storage = create_data_file(out_file,
+      hdf5_file, data_storage, truth_storage, affine_storage = create_data_file(out_file,
                                                                 n_channels=n_channels,
                                                                 n_samples=n_samples,
                                                                 image_shape=image_shape)
@@ -133,7 +135,7 @@ def write_data_to_file(training_data_files, out_file, image_shape, truth_dtype=n
       os.remove(out_file)
       raise e
 
-  write_image_data_to_file(training_data_files, data_storage, truth_storage, image_shape,
+  write_image_data_to_file(training_data_files, data_storage, truth_storage, affine_storage, image_shape,
                             truth_dtype=truth_dtype, n_channels=n_channels, crop=crop)
   if subject_ids:
       hdf5_file.create_array(hdf5_file.root, 'subject_ids', obj=subject_ids)

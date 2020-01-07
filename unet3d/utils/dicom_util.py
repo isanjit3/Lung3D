@@ -595,3 +595,47 @@ def get_crop_size(img, rtol=1e-8):
     #Convert to slice format
     slices = [slice(s[0], s[1]) for s in slices]
     return slices
+
+def extract_cosines(image_orientation):
+    row_cosine = np.array(image_orientation[:3])
+    column_cosine = np.array(image_orientation[3:])
+    slice_cosine = np.cross(row_cosine, column_cosine)
+    return row_cosine, column_cosine, slice_cosine
+
+def slice_positions(slice_datasets):
+    image_orientation = slice_datasets[0].ImageOrientationPatient
+    row_cosine, column_cosine, slice_cosine = extract_cosines(image_orientation)
+    return [np.dot(slice_cosine, d.ImagePositionPatient) for d in slice_datasets]
+
+def slice_spacing(slice_datasets):
+    if len(slice_datasets) > 1:
+        slice_pos = slice_positions(slice_datasets)
+        slice_positions_diffs = np.diff(sorted(slice_pos))
+        return np.mean(slice_positions_diffs)
+    else:
+        return 0.0
+
+def get_affine_matrix(slices, slice_space=None):
+    """
+    Adopted from : https://github.com/innolitics/dicom-numpy/blob/master/dicom_numpy/combine_slices.py
+    Inputs:
+        slices: Scan image slices in the sorted order.
+        slice_space: Provide the slicing space if you are going to normalize to 1x1x1 voxels 
+    """
+    first_dataset = slices[0] #Assuming slices are already sorted
+    image_orientation = first_dataset.ImageOrientationPatient
+    row_cosine, column_cosine, slice_cosine = extract_cosines(image_orientation)
+
+    row_spacing, column_spacing = first_dataset.PixelSpacing
+    if slice_space is None:
+        slice_space = slice_spacing(slices)
+
+    transform = np.identity(4, dtype=np.float32)
+
+    transform[:3, 0] = row_cosine * column_spacing
+    transform[:3, 1] = column_cosine * row_spacing
+    transform[:3, 2] = slice_cosine * slice_space
+
+    transform[:3, 3] = first_dataset.ImagePositionPatient
+
+    return transform

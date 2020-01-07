@@ -1,26 +1,34 @@
+import os
 import numpy as np
 import nibabel as nib
 from nilearn.image import new_img_like, resample_to_img
 import random
 import itertools
+import scipy
+from unet3d.utils import dicom_util
 
 
-def scale_image(image, scale_factor):
+def scale_image(image, affine, scale_factor):
+    
+    #img = scipy.ndimage.interpolation.zoom(image, (scale_factor[0], scale_factor[1], 1))
+    #return img
+    
     scale_factor = np.asarray(scale_factor)
-    new_affine = np.copy(image.affine)
-    new_affine[:3, :3] = image.affine[:3, :3] * scale_factor
-    new_affine[:, 3][:3] = image.affine[:, 3][:3] + (image.shape * np.diag(image.affine)[:3] * (1 - scale_factor)) / 2
-    return new_img_like(image, data=image.get_data(), affine=new_affine)
-
-
+    new_affine = np.copy(affine)
+    new_affine[:3, :3] = affine[:3, :3] * scale_factor
+    new_affine[:, 3][:3] = affine[:, 3][:3] + (image.shape * np.diag(affine)[:3] * (1 - scale_factor)) / 2
+    new_img = scipy.ndimage.affine_transform(image, new_affine)   
+    return new_img
+    #return new_img_like(image, data=image.get_data(), affine=new_affine)   
+    
 def flip_image(image, axis):
     try:
-        new_data = np.copy(image.get_data())
+        new_data = np.copy(image)
         for axis_index in axis:
             new_data = np.flip(new_data, axis=axis_index)
     except TypeError:
-        new_data = np.flip(image.get_data(), axis=axis)
-    return new_img_like(image, data=new_data)
+        new_data = np.flip(image, axis=axis)
+    return new_data
 
 
 def random_flip_dimensions(n_dimensions):
@@ -39,11 +47,11 @@ def random_boolean():
     return np.random.choice([True, False])
 
 
-def distort_image(image, flip_axis=None, scale_factor=None):
+def distort_image(image, affine, flip_axis=None, scale_factor=None):
     if flip_axis:
         image = flip_image(image, flip_axis)
     if scale_factor is not None:
-        image = scale_image(image, scale_factor)
+        image = scale_image(image, affine, scale_factor)
     return image
 
 
@@ -57,21 +65,26 @@ def augment_data(data, truth, affine, scale_deviation=None, flip=True):
         flip_axis = random_flip_dimensions(n_dim)
     else:
         flip_axis = None
+    
+    #Augment Data for each channel
     data_list = list()
     for data_index in range(data.shape[0]):
-        image = get_image(data[data_index], affine)
-        data_list.append(resample_to_img(distort_image(image, flip_axis=flip_axis,
-                                                       scale_factor=scale_factor), image,
-                                         interpolation="continuous").get_data())
+        image = data[data_index]
+        distorted_img = distort_image(image, affine, flip_axis=flip_axis, scale_factor=scale_factor)        
+        #sample_img = resample_to_img(distorted_img, image, interpolation="continuous")
+        data_list.append(distorted_img)
+
     data = np.asarray(data_list)
-    truth_image = get_image(truth, affine)
-    truth_data = resample_to_img(distort_image(truth_image, flip_axis=flip_axis, scale_factor=scale_factor),
-                                 truth_image, interpolation="nearest").get_data()
+
+    #Augment truth
+    truth_image = truth    
+    truth_data = distort_image(truth_image, affine, flip_axis=flip_axis, scale_factor=scale_factor)
+    #truth_data = resample_to_img(distorted_img, image,interpolation="nearest")
     return data, truth_data
 
 
 def get_image(data, affine, nib_class=nib.Nifti1Image):
-    return nib_class(dataobj=data, affine=affine)
+    return data
 
 
 def generate_permutation_keys():

@@ -36,9 +36,11 @@ def process_dicom(subject, process_folder, overwrite=False):
       img_data = dicom_util.get_scan_data(scan_image_path)
       mask_data = None
   
-    save_processed_img(img_data, mask_data, process_path, scan_image_path=scan_image_path)
+    scan_slices = dicom_util.get_scan_slices(scan_image_path)
+    affine = dicom_util.get_affine_matrix(scan_slices)
+    save_processed_img(img_data, mask_data, affine, process_path,  scan_image_path=scan_image_path)
 
-def save_processed_img(img_data, mask_data, save_path, scan_image_path = None):
+def save_processed_img(img_data, mask_data, affine, save_path, scan_image_path = None):
   slice_count = img_data.shape[0]
   img_size = config.config["image_shape"][0]
   if slice_count < img_size:
@@ -69,7 +71,7 @@ def save_processed_img(img_data, mask_data, save_path, scan_image_path = None):
         
     #save it to the disk
     print("Writing Compressed file.")
-    savez_compressed(os.path.join(save_path, "scan.data.3d." + str(b)), data=data, truth=mask)
+    savez_compressed(os.path.join(save_path, "scan.data.3d." + str(b)), data=data, truth=mask, affine=affine)
 
 def process_subject_folder(subject, overwrite=False):
   """
@@ -118,6 +120,9 @@ def process_subject_folder(subject, overwrite=False):
     if img_data.min() == 0:
       img_data = img_data-1024
     
+    #Get the affine matrix. You are going to normalize to 1x1x1 voxels.
+    affine = dicom_util.get_affine_matrix(scan_slices, 1.0)
+
     #Get the Segmented Lung Slices
     print("Segmenting the Lung")
     segmented_lung_slices = dicom_util.segment_lung_mask(slices)
@@ -159,11 +164,11 @@ def process_subject_folder(subject, overwrite=False):
 
   #save the image cubes to disk
   print("Saving the processed image")
-  save_processed_img(cropped_lung_slices, cropped_mask,process_path, scan_image_path)
+  save_processed_img(cropped_lung_slices, cropped_mask, affine, process_path, scan_image_path)
   
 
 
-def pre_process_dicom_files(data_folder, process_folder, overwrite=False ):
+def pre_process_dicom_files(data_folder, process_folder, overwrite=False, use_pool=False ):
   """
   Preprocess the dicom files. Read each of the study folder and create 3D image.
   """
@@ -178,7 +183,7 @@ def pre_process_dicom_files(data_folder, process_folder, overwrite=False ):
 
  
   subject_count = 0
-  if True: #Use multi-threadig.
+  if use_pool: #Use multi-threadig.
     pool = Pool(processes=8)
     result = pool.map(process_subject_folder, subjects)
     pool.close()
@@ -186,7 +191,7 @@ def pre_process_dicom_files(data_folder, process_folder, overwrite=False ):
     print(result)
   else:
     for _, subject in enumerate(subjects):    
-      process_subject_folder(subject)
+      process_subject_folder(subject, overwrite=overwrite)
       subject_count += 1
       print("Processed Subject Count:", subject_count)          
 
@@ -203,12 +208,17 @@ def normalize_data():
   ds = hdf5.root["data"]
   dicom_data_util.normalize_data_storage(ds)
 
-
-pre_process_dicom_files(config.config["data_path"], config.config["processed_data_path"])  
+#===============================================================================
+"""
+pre_process_dicom_files(data_folder = config.config["data_path"], 
+                        process_folder = config.config["processed_data_path"], 
+                        overwrite=False, 
+                        use_pool=True
+                      )  
+"""
 
 #Create hdf5 file
-#write_data_file(config.config["processed_data_path"])
-
+write_data_file(config.config["processed_data_path"])
 
 #subject_folder = os.path.join(config.config["data_path"], "LUNG1-362")
 #process_dicom(subject = subject_folder, process_folder = config.config["processed_data_path"], overwrite=True)

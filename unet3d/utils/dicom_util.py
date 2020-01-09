@@ -515,7 +515,8 @@ def save_img_3d(image, save_path, threshold=-300):
     
     # Position the scan upright, 
     # so the head of the patient would be at the top facing the camera
-    p = image.transpose(2,1,0)
+    #p = image.transpose(2,1,0)
+    p = image
        
     verts, faces, normals, values = measure.marching_cubes_lewiner(p, threshold)
 

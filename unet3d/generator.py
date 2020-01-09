@@ -165,9 +165,17 @@ def get_number_of_patches(data_file, index_list, patch_shape=None, patch_overlap
         index_list = create_patch_index_list(index_list, data_file.root.data.shape[-3:], patch_shape, patch_overlap,
                                              patch_start_offset)
         count = 0
+        #processed_index = -1
         for index in index_list:
             x_list = list()
             y_list = list()
+            """
+            if index[0] != processed_index:
+                processed_index = index[0]               
+                cc = np.count_nonzero(data_file.root.truth[processed_index][0])
+                print("Processing patch_index:", processed_index, " Non-zero count:", cc)
+            """
+
             add_data(x_list, y_list, data_file, index, skip_blank=skip_blank, patch_shape=patch_shape)
             if len(x_list) > 0:
                 count += 1
@@ -208,6 +216,8 @@ def add_data(x_list, y_list, data_file, index, augment=False, augment_flip=False
     :return:
     """
     data, truth = get_data_from_file(data_file, index, patch_shape=patch_shape)
+    #if np.any(truth != 0):
+    #    print("Patch before Augmentation has non-zero values.")
     if augment:
         if patch_shape is not None:
             affine = data_file.root.affine[index[0]]
@@ -226,7 +236,7 @@ def add_data(x_list, y_list, data_file, index, augment=False, augment_flip=False
     if not skip_blank or np.any(truth != 0):
         x_list.append(data)
         y_list.append(truth)
-
+        #print("Non-zero truth found in patch at patch index:", index)
 
 def get_data_from_file(data_file, index, patch_shape=None):
     if patch_shape:

@@ -5,21 +5,27 @@ from nilearn.image import new_img_like, resample_to_img
 import random
 import itertools
 import scipy
-from unet3d.utils import dicom_util
-
+from unet3d.utils import dicom_util, utils
 
 def scale_image(image, affine, scale_factor):
+    #scale the image only in x, y dimension. Z dimension remains the same
+    scaled_img = scipy.ndimage.interpolation.zoom(image, (scale_factor[0], scale_factor[1], 1))
+    resampled_img = np.zeros(image.shape, image.dtype)
     
-    #img = scipy.ndimage.interpolation.zoom(image, (scale_factor[0], scale_factor[1], 1))
-    #return img
-    
+    #calculate the paste offsets
+    loc = tuple(np.subtract(resampled_img.shape, scaled_img.shape) // 2)       
+    utils.paste(resampled_img, scaled_img, loc)
+    return resampled_img
+
+    """
     scale_factor = np.asarray(scale_factor)
     new_affine = np.copy(affine)
     new_affine[:3, :3] = affine[:3, :3] * scale_factor
     new_affine[:, 3][:3] = affine[:, 3][:3] + (image.shape * np.diag(affine)[:3] * (1 - scale_factor)) / 2
-    new_img = scipy.ndimage.affine_transform(image, new_affine)   
+    new_img = scipy.ndclimage.affine_transform(image, new_affine)   
     return new_img
     #return new_img_like(image, data=image.get_data(), affine=new_affine)   
+    """
     
 def flip_image(image, axis):
     try:

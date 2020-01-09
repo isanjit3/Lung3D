@@ -1,8 +1,9 @@
-
 import os
 import glob
 import config
 import numpy as np
+import scipy
+from unet3d.utils import utils
 from unet3d import dicom_data_util
 from unet3d.utils import dicom_util
 from unet3d import generator, model, training
@@ -64,6 +65,35 @@ def verify_min_max_values():
 
 
 
+def validate_data_and_truth():
+    data_file = dicom_data_util.open_data_file(config.config["data_file"])
+    print(data_file.root.data.shape)
+    print(data_file.root.truth.shape)
+    di = 69 #data index
+
+    truth = data_file.root.truth
+    data = data_file.root.data
+
+    truth_img = truth[di][0]
+    non_zero_count = np.count_nonzero(truth_img)
+    print("Non Zero Count for index: %d is %d" % (di, non_zero_count))
+    if non_zero_count > 0:
+        #dicom_util.save_img_3d(truth_img, os.path.abspath("channel_images.png"), 0)
+
+        img = scipy.ndimage.interpolation.zoom(truth_img, (0.25, 1.25, 1))
+        dicom_util.save_img_3d(img, save_path=os.path.abspath("rescaled_image.png"), threshold=0)
+        img_x = np.zeros(truth_img.shape, truth.dtype)
+        print("Scaled image shape: ", img.shape)
+        print("Destination Image Shape: ", img_x.shape)
+        loc = tuple(np.subtract(img_x.shape, img.shape) // 2)       
+        utils.paste(img_x, img, loc)
+        dicom_util.save_img_3d(img_x, save_path=os.path.abspath("resampled_image.png"), threshold=0)
+
+        #save specific image slice
+        img = truth_img[:, :, 60]
+        dicom_util.save_img(img_arr = (img,), save_path=os.path.abspath("channel_images_60.png"))
+                
+
 
 #-------------------------------------------------
 #call the function to test
@@ -71,4 +101,6 @@ def verify_min_max_values():
 #display_img_from_hdf5()
 #get_model()
 
-verify_min_max_values()
+#verify_min_max_values()
+
+validate_data_and_truth()

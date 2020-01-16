@@ -80,7 +80,7 @@ def validate_data_and_truth():
     if non_zero_count > 0:
         #dicom_util.save_img_3d(truth_img, os.path.abspath("channel_images.png"), 0)
 
-        img = scipy.ndimage.interpolation.zoom(truth_img, (0.25, 1.25, 1))
+        img = scipy.ndimage.interpolation.zoom(truth_img, (0.25, 0.0025, 1))
         dicom_util.save_img_3d(img, save_path=os.path.abspath("rescaled_image.png"), threshold=0)
         img_x = np.zeros(truth_img.shape, truth.dtype)
         print("Scaled image shape: ", img.shape)

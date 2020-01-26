@@ -1,5 +1,6 @@
 #DICOM utility class
 import os
+import glob
 import pydicom
 import numpy as np
 import scipy
@@ -458,6 +459,21 @@ def get_scan_countour_filenames(scan_folders):
       contour_file_name = None    
     
     return scan_image_path, contour_file_name
+
+def is_scan_image_directory(dir):
+    files = glob.glob(os.path.join(dir, "*.dcm"), recursive=True)
+    is_scan = True
+    try:
+        dicom_file = pydicom.read_file(files[0])     
+        dicom_file.pixel_array #Check if this is scan file. If not scan file, this will throw exception
+        
+    except:
+        #This is contour file.    
+        is_scan = False 
+
+    return is_scan  
+
+
 
 def largest_label_volume(im, bg=-1):
     vals, counts = np.unique(im, return_counts=True)

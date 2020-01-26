@@ -63,8 +63,6 @@ def verify_min_max_values():
         min = scan_data['data'].min()
         print(min, ", ", max, " :", s)
 
-
-
 def validate_data_and_truth():
     data_file = dicom_data_util.open_data_file(config.config["data_file"])
     print(data_file.root.data.shape)

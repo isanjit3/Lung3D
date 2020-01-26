@@ -20,3 +20,4 @@ v2.3.2.tar.gz
 prediction/
 model_weights/
 prediction_old/
+web/vue-app/node_modules/

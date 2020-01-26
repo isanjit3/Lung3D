@@ -1,7 +1,7 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
 import Home from '../views/Home.vue'
-import Ping from '../components/Ping.vue';
+
 
 Vue.use(VueRouter)
 
@@ -22,8 +22,13 @@ const routes = [
   {
     path: '/ping',
     name: 'ping',
-    component: Ping
+    component: () => import ('../components/Ping.vue')
   },
+  {
+    path: '/upload',
+    name: 'upload',
+    component: () => import('../views/Upload.vue')
+  }
 ]
 
 const router = new VueRouter({

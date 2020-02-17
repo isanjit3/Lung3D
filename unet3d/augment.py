@@ -7,12 +7,11 @@ import itertools
 import scipy
 from unet3d.utils import dicom_util, utils
 
-def scale_image(image, affine, scale_factor):
-    return image
-    
+def scale_image(image, affine, scale_factor):   
+    return image 
     try:
         #scale the image only in x, y dimension. Z dimension remains the same
-        scaled_img = scipy.ndimage.interpolation.zoom(image, (scale_factor[0], scale_factor[1], 1))
+        scaled_img = scipy.ndimage.interpolation.zoom(image, (scale_factor[0], scale_factor[1], 1))                
         resampled_img = np.zeros(image.shape, image.dtype)    
         #calculate the paste offsets
         loc = tuple(np.subtract(resampled_img.shape, scaled_img.shape) // 2)       

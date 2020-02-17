@@ -41,10 +41,7 @@ def uploadFile():
         newFileName = str(autoGenFileName) + '.' + fileExt
         saveFile = os.path.join(app.config['UPLOAD_FOLDER'], newFileName)
         if not os.path.exists(os.path.dirname(saveFile)):
-            try:
-                os.makedirs(os.path.dirname(saveFile))
-            except OSError as exc: # Guard against race condition
-                raise
+            os.makedirs(os.path.dirname(saveFile))
             
         file.save(saveFile)
       

@@ -2,18 +2,15 @@ import os
 
 config = dict()
 config["model"] = "ISENSE"
-config["data_path"] = "/home/sanjit/datasets/lung/"
-config["processed_data_path"] = "/home/sanjit/datasets/lung_processed/"
-
 config["min_bound"] = -1000.0   #Minimum HU value we care about
 config["max_bound"] = 400.0     #Max HU value we care about.
 config["pixel_mean"] = 0.25
-config["image_shape"] = (144, 144, 144)
+config["image_shape"] = (128, 128, 128)
 
 
 config["labels"] = (1,)  # the label numbers on the input image
 config["n_labels"] = len(config["labels"])
-config["patch_shape"] = (64,64,64)
+config["patch_shape"] =  (64,64,64)
 config["nb_channels"] = 1 #We have only one modalities.
 config["n_base_filters"] = 16
 #config["all_modalities"] = ["t1", "t1ce", "flair", "t2"]
@@ -46,16 +43,17 @@ config["training_patch_start_offset"] = (16, 16, 16)  # randomly offset the firs
 config["skip_blank"] = True  # if True, then patches without any target will be skipped
 
 if (config["model"] == "ISENSE"):
-    config["data_file"] = os.path.abspath("lung_data_file.h5")
     config["model_file"] = os.path.abspath("lung_tumor_isensee_2017_model.h5")
     config["training_file"] = os.path.abspath("isensee_training_ids.pkl")
     config["validation_file"] = os.path.abspath("isensee_validation_ids.pkl")
-else:
-    config["data_file"] = os.path.abspath("lung_data_file.h5")
+else:    
     config["model_file"] = os.path.abspath("lung_tumor_segmentation_model.h5")
     config["training_file"] = os.path.abspath("lung_training_ids.pkl")
     config["validation_file"] = os.path.abspath("lung_validation_ids.pkl")
 
+config["data_path"] = "/home/sanjit/datasets/lung/"
+config["processed_data_path"] = "/home/sanjit/datasets/lidc_processed/"
+config["data_file"] = os.path.abspath("merged_lung_data_file.h5")
 config["mask_file"] = os.path.abspath("foregound_mask")
 config["mask_file_img"] = os.path.abspath("foregound_mask.png")
 config["segmented_lung_img"] = os.path.abspath("segmented_lung_img.png")
@@ -63,4 +61,4 @@ config["segmented_mask_img"] = os.path.abspath("segmented_mask_img.png")
 config["cropped_lung_img"] = os.path.abspath("cropped_lung_img.png")
 config["cropped_mask_img"] = os.path.abspath("cropped_mask_img.png")
 
-config["overwrite"] = False  # If True, will previous files. If False, will use previously written files.
+config["overwrite"] = True  # If True, will previous files. If False, will use previously written files.

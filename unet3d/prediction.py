@@ -5,6 +5,7 @@ import numpy as np
 import tables
 import SimpleITK as sitk
 import cv2
+import csv
 
 from .training import load_old_model
 from .utils import pickle_load
@@ -129,7 +130,9 @@ def run_validation_case(data_index, output_dir, model, data_file, training_modal
 
     pred = prediction[0][0]
     pred[pred<0.75] = 0
-    if np.any(pred) > 0 and np.any(truth_data[0][0]) > 0:
+    cancer_truth = np.any(truth_data[0][0]) > 0
+    cancer_pred = np.any(pred) > 0
+    if cancer_pred > 0 and cancer_truth:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         dicom_util.save_img_3d(test_data[0][0], save_path=os.path.join(output_dir, "data.png"), threshold= test_data[0][0].min())
@@ -145,14 +148,14 @@ def run_validation_case(data_index, output_dir, model, data_file, training_modal
                         os.makedirs(output_dir)
 
                     predicted_image = prediction[i, j, :, :, k]
-                    predicted_image[predicted_image < 0.75] = 0
+                    predicted_image[predicted_image < 0.5] = 0
                     dicom_util.save_img(img_arr = (test_data[i, j, :, :, k], 
                                                     truth_data[i, j, :, :, k], 
                                                     prediction[i, j, :, :, k]
                                                 ), 
                                         save_path=os.path.join(output_dir, file_name))
             break
-                
+        return [data_index, cancer_truth, cancer_pred]        
 
     """
     prediction_image = prediction_to_image(prediction, affine, label_map=output_label_map, threshold=threshold,
@@ -169,12 +172,21 @@ def run_validation_cases(validation_keys_file, model_file, training_modalities, 
     validation_indices = pickle_load(validation_keys_file)
     model = load_old_model(model_file)
     data_file = tables.open_file(hdf5_file, "r")
+    csv_file = open(os.path.abspath("prediction.log"), mode="w")
+    csv_writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    csv_writer.writerow(['index', 'truth', 'prediction'])
+
     for index in validation_indices:
         case_directory = os.path.join(output_dir, "validation_case_{}".format(index))
-        run_validation_case(data_index=index, output_dir=case_directory, model=model, data_file=data_file,
+        print("Running prediction at index:", index)
+        result = run_validation_case(data_index=index, output_dir=case_directory, model=model, data_file=data_file,
                             training_modalities=training_modalities, output_label_map=output_label_map, labels=labels,
                             threshold=threshold, overlap=overlap, permute=permute)
+        csv_writer.writerow(result)
+        csv_file.flush()
+
     data_file.close()
+    csv_file.close()
 
 
 def predict(model, data, permute=False):

@@ -50,7 +50,9 @@ def parse_dicom_file(fileName):
         
         if slope != 1:
             dcm_image = slope * dcm_image.astype(np.float64)
-            dcm_image = dcm_image.astype(np.int16)            
+            dcm_image = dcm_image.astype(np.int16)   
+
+        if intercept != 0:         
             dcm_image += np.int16(intercept)
 
         return np.array(dcm_image, dtype=np.int16)
@@ -416,13 +418,14 @@ def reslice_image(image, spacing, new_spacing=[1,1,1]):
 
     return image
 
-def normalize(image, min_bound, max_bound, pixel_mean):
-    image = (image - min_bound) / (max_bound - min_bound)
+def normalize(image, min_bound, max_bound, pixel_mean = None):
+    image = (image - min_bound) / (max_bound - min_bound)   
     image[image>1] = 1.
     image[image<0] = 0.
 
     #zero center the image so that the mean value is 0
-    image = image - pixel_mean
+    if pixel_mean:
+        image = image - pixel_mean
     return image
 
 def get_scan_slices(path):
@@ -527,12 +530,14 @@ def segment_lung_mask(image, fill_lung_structures=True):
  
     return binary_image
 
-def save_img_3d(image, save_path, threshold=-300):
+def save_img_3d(image, save_path, threshold=None, do_transpose=False):
     
     # Position the scan upright, 
     # so the head of the patient would be at the top facing the camera
-    #p = image.transpose(2,1,0)
-    p = image
+    if do_transpose:
+        p = image.transpose(2,1,0)
+    else:
+        p = image
        
     verts, faces, normals, values = measure.marching_cubes_lewiner(p, threshold)
 
@@ -552,6 +557,18 @@ def save_img_3d(image, save_path, threshold=-300):
     plt.savefig(save_path)
     plt.close()
 
+def save_histogram(img, save_path):
+    """
+    Saves historgram of the given image.
+    Inputs:
+        img: 2D image Numpy array
+        save_path: Full path of image where to save.
+    """
+    plt.hist(img.flatten(), bins=80, color='c')
+    plt.xlabel("Hounsfield Units (HU)")
+    plt.ylabel("Frequency")
+    plt.savefig(save_path)
+    plt.close()
 
 def get_crop_size(img, rtol=1e-8):
     """Crops img as much as possible

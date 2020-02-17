@@ -113,7 +113,7 @@ def get_validation_split(data_file, training_file, validation_file, data_split=0
     """
     if overwrite or not os.path.exists(training_file):
         print("Creating validation split...")
-        nb_samples = data_file.root.data.shape[0]
+        nb_samples = data_file.root.data.shape[0]       
         sample_list = list(range(nb_samples))
         training_list, validation_list = split_list(sample_list, split=data_split)
         pickle_dump(training_list, training_file)

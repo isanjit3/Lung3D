@@ -3,23 +3,42 @@ import glob
 import config
 import numpy as np
 import scipy
+import random
+from random import shuffle
+
 from unet3d.utils import utils
 from unet3d import dicom_data_util
 from unet3d.utils import dicom_util
 from unet3d import generator, model, training
+from unet3d.model import isensee2017_model
 
 
-def display_img_from_hdf5():
+
+def display_img_from_hdf5(img_index, slice_index):
     hdf5 = dicom_data_util.open_data_file(config.config["data_file"])
-    scan = hdf5.root["data"][50, 0, :, :, 4]
-    mask = hdf5.root["truth"][50, 0, :, :, 4]
+    scan = hdf5.root["data"][img_index, 0, :, :, slice_index]
+    mask = hdf5.root["truth"][img_index, 0, :, :, slice_index]
     dicom_util.show_img_msk_fromarray(scan, mask, save_path="img")
+    dicom_util.save_histogram(scan, save_path=os.path.abspath("histogram.png"))
 
 def validate_npz():
-    scan_file = "/home/sanjit/datasets/lung_processed/LUNG1-172/05-27-2007-StudyID-54005/scan.3d.27.npz"
+    scan_file = "/home/sanjit/datasets/lung_processed/LUNG1-002/01-01-2014-StudyID-85095/scan.data.3d.0.npz"
+    samples = glob.glob(os.path.join(config.config["processed_data_path"], "*", "*", "scan.*"))    
+    index = random.randint(0,len(samples)-1)
+    #scan_file = samples[index]
+
     scan_data = np.load(scan_file)
-    print(scan_data["scan"].shape)
-    print(scan_data["mask"].shape)
+    print(scan_data["data"].shape)
+    print(scan_data["truth"].shape)
+    
+    scan = scan_data["data"][:, :, 70]
+    mask = scan_data["truth"][:, :, 70]
+    
+    scan = dicom_util.normalize(image = scan, min_bound = config.config["min_bound"], max_bound = config.config["max_bound"])
+
+    dicom_util.show_img_msk_fromarray(scan, mask, save_path="img")
+    dicom_util.save_histogram(scan, save_path=os.path.abspath("histogram.png"))
+
 
 def get_model():
     cnn_model = model.unet_model_3d(input_shape=config.config["input_shape"],
@@ -91,14 +110,32 @@ def validate_data_and_truth():
         img = truth_img[:, :, 60]
         dicom_util.save_img(img_arr = (img,), save_path=os.path.abspath("channel_images_60.png"))
                 
+def get_isense_model():
+    model = isensee2017_model(input_shape=config.config["input_shape"], 
+                                  n_labels=config.config["n_labels"],
+                                  initial_learning_rate=config.config["initial_learning_rate"],
+                                  n_base_filters=config.config["n_base_filters"])
+    model.summary()
+
+def get_training_validation_split():
+    data_file = dicom_data_util.open_data_file(config.config["data_file"])
+    nb_samples = data_file.root.data.shape[0]       
+    sample_list = list(range(nb_samples))
+    shuffle(sample_list)
+    n_training = int(len(sample_list) * config.config["validation_split"])
+    training = sample_list[:n_training]
+    testing = sample_list[n_training:]
+    print("Training Steps:", len(training))
+    print("Validation Steps:", len(testing))
 
 
 #-------------------------------------------------
-#call the function to test
+
+#display_img_from_hdf5(85, 50)
+
+#process_single_subject("/home/sanjit/datasets/lung/LUNG1-172")
 #validate_npz()
-#display_img_from_hdf5()
-#get_model()
 
-#verify_min_max_values()
+get_training_validation_split()
 
-validate_data_and_truth()
+

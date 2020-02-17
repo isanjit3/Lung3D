@@ -97,7 +97,10 @@ def write_image_data_to_file(image_files, data_storage, truth_storage, affine_st
     
     data_storage.append(scan_data['data'][np.newaxis][np.newaxis])   
     truth_storage.append(scan_data['truth'][np.newaxis][np.newaxis])
-    affine_storage.append(scan_data['affine'][np.newaxis])
+    #affine_storage.append(scan_data['affine'][np.newaxis])
+    #Create Dummy affine
+    affine = np.zeros((4,4), np.float32)
+    affine_storage.append(affine[np.newaxis])
 
     fileCount += 1
     print("Total File Count:", fileCount)

@@ -20,4 +20,8 @@ v2.3.2.tar.gz
 prediction/
 model_weights/
 prediction_old/
+prediction_isense/
+prediction_best_case/
+prediction_before_zero_center/
+prediction_before_aug/
 web/vue-app/node_modules/

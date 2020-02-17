@@ -1,5 +1,6 @@
 #Pre-process dicom files.
 import os
+import shutil
 import glob
 import pydicom
 import numpy as np
@@ -49,29 +50,36 @@ def save_processed_img(img_data, mask_data, affine, save_path, scan_image_path =
   
   blobs = slice_count // img_size
   slices_to_drop = slice_count - blobs * img_size
-  start_index = slices_to_drop // 2
-    
-  #Construct 256x256x256 image cube
-  print("Constructing 3D image cube and Resizing images to create ", config.config["image_shape"])
-  for b in range(0, blobs):
-    #Initialize the data and mask place holder.
-    data = np.zeros(config.config["image_shape"])
-    mask = np.zeros(config.config["image_shape"])
+  initial_index = slices_to_drop // 2
+  try:  
+    #Construct 256x256x256 image cube
+    print("Constructing 3D image cube and Resizing images to create ", config.config["image_shape"])
+    for b in range(0, blobs):
+      #Initialize the data and mask place holder.
+      data = np.zeros(config.config["image_shape"])
+      mask = np.zeros(config.config["image_shape"])
 
-    start_index = start_index + b * img_size
-    for i in range(start_index, start_index + img_size):
-      depth = i-start_index
-      #TODO: Crop image based on Cropping parameters
-      xscale = img_size/img_data[i].shape[0]
-      yscale = img_size/img_data[i].shape[1]          
-      data[:,:,depth] = scipy.ndimage.interpolation.zoom(img_data[i], [xscale, yscale])
+      start_index = initial_index + b * img_size
+      for i in range(start_index, start_index + img_size):
+        depth = i-start_index
+      
+        xscale = img_size/img_data[i].shape[0]
+        yscale = img_size/img_data[i].shape[1]          
+        data[:,:,depth] = scipy.ndimage.interpolation.zoom(img_data[i], [xscale, yscale])
 
-      if (not (mask_data is None)):
-        mask[:,:,depth] = scipy.ndimage.interpolation.zoom(mask_data[i], [xscale, yscale])
-        
-    #save it to the disk
-    print("Writing Compressed file.")
-    savez_compressed(os.path.join(save_path, "scan.data.3d." + str(b)), data=data, truth=mask, affine=affine)
+        if (not (mask_data is None)):
+          mask[:,:,depth] = scipy.ndimage.interpolation.zoom(mask_data[i], [xscale, yscale])
+
+        #TODO: Debug only. Remove this.
+        #dicom_util.show_img_msk_fromarray(data[:,:,depth], mask[:,:,depth], save_path="img_%d_%d" % (b, depth))  
+
+      #save it to the disk
+      print("Writing Compressed file.")
+      savez_compressed(os.path.join(save_path, "scan.data.3d." + str(b)), data=data, truth=mask, affine=affine)
+  except Exception as e:
+    print("Failed to process the file: ", scan_image_path)
+    print(e)
+    shutil.rmtree(save_path)
 
 def process_subject_folder(subject, overwrite=False):
   """
@@ -91,8 +99,10 @@ def process_subject_folder(subject, overwrite=False):
     if not os.path.exists(process_path):
       os.makedirs(process_path)
     elif not overwrite : 
-      print("Processed 3D data already exists. Skipping:", sf)
-      return
+      files = os.listdir(process_path)
+      if (len(files) > 0):
+        print("Processed 3D data already exists. Skipping:", sf)
+        return
 
     scan_folders = glob.glob(os.path.join(sf, "*"))
     scan_image_path, contour_file_name = dicom_util.get_scan_countour_filenames(scan_folders)
@@ -122,7 +132,7 @@ def process_subject_folder(subject, overwrite=False):
     
     #Get the affine matrix. You are going to normalize to 1x1x1 voxels.
     affine = dicom_util.get_affine_matrix(scan_slices, 1.0)
-
+    
     #Get the Segmented Lung Slices
     print("Segmenting the Lung")
     segmented_lung_slices = dicom_util.segment_lung_mask(slices)
@@ -147,20 +157,40 @@ def process_subject_folder(subject, overwrite=False):
   crop_slices = dicom_util.get_crop_size(foreground) 
   slice1 = crop_slices[0]
   slice2 = crop_slices[1]
+  
+  #dicom_util.show_img_msk_fromarray(img_data[70], mask_data[70], save_path="img_before_cropping")
+  #dicom_util.save_histogram(img_data[70], save_path=os.path.abspath("histogram_before_cropping.png"))
 
   cropped_lung_slices = img_data[:, slice1, slice2]
   cropped_mask = mask_data[:, slice1, slice2]
+
+  #dicom_util.show_img_msk_fromarray(cropped_lung_slices[70], cropped_mask[70], save_path="img_before_normalizing")
+  #dicom_util.save_histogram(cropped_lung_slices[70], save_path=os.path.abspath("histogram_before_normalizing.png"))
+
+  #Normalize the data so that the values are 0....1
+  cropped_lung_slices = cropped_lung_slices.astype(np.float32)
+  for i in range(cropped_lung_slices.shape[0]):    
+    cropped_lung_slices[i] = dicom_util.normalize(image = cropped_lung_slices[i], min_bound = config.config["min_bound"], max_bound = config.config["max_bound"])
+  
+  #dicom_util.show_img_msk_fromarray(cropped_lung_slices[70], cropped_mask[70], save_path="img_after_normalizing")
+  #dicom_util.save_histogram(cropped_lung_slices[70], save_path=os.path.abspath("histogram_after_normalizing.png"))
+ 
+
   if save_segmented_lung:
     print("Saving Cropped 3D lung as image at: ", config.config['cropped_lung_img'])
     dicom_util.save_img_3d(image=cropped_lung_slices, save_path=config.config['cropped_lung_img'], threshold=0)
     if has_mask:
       dicom_util.save_img_3d(image=cropped_mask, save_path=config.config['cropped_mask_img'], threshold=0)
+  
 
   # Determine current pixel spacing and reslice images to 1m3 voxels
   print("Reslicing the scan image and mask")
   spacing = np.array([scan_slices[0].SliceThickness] + list(scan_slices[0].PixelSpacing), dtype=np.float32)
   cropped_lung_slices = dicom_util.reslice_image(cropped_lung_slices, spacing)
   cropped_mask = dicom_util.reslice_image(cropped_mask, spacing)
+
+  #dicom_util.show_img_msk_fromarray(cropped_lung_slices[70], cropped_mask[70], save_path="img_after_reslicing")
+  #dicom_util.save_histogram(cropped_lung_slices[70], save_path=os.path.abspath("histogram_after_reslicing.png"))
 
   #save the image cubes to disk
   print("Saving the processed image")
@@ -184,7 +214,7 @@ def pre_process_dicom_files(data_folder, process_folder, overwrite=False, use_po
  
   subject_count = 0
   if use_pool: #Use multi-threadig.
-    pool = Pool(processes=8)
+    pool = Pool(processes=12)
     result = pool.map(process_subject_folder, subjects)
     pool.close()
     pool.join()
@@ -200,8 +230,7 @@ def write_data_file(processed_folder, overwrite=False):
   samples = glob.glob(os.path.join(processed_folder, "*", "*", "scan.*"))
   print(len(samples))
   dicom_data_util.write_data_to_file(samples, config.config["data_file"], config.config["image_shape"])
-    
-    #read the scan and mask file and write to hdf5 file.
+  
 
 def normalize_data():
   hdf5 = dicom_data_util.open_data_file(config.config["data_file"])
@@ -218,9 +247,9 @@ pre_process_dicom_files(data_folder = config.config["data_path"],
 """
 
 #Create hdf5 file
-write_data_file(config.config["processed_data_path"])
+#write_data_file(config.config["processed_data_path"], overwrite=True)
 
-#subject_folder = os.path.join(config.config["data_path"], "LUNG1-362")
-#process_dicom(subject = subject_folder, process_folder = config.config["processed_data_path"], overwrite=True)
+subject_folder = os.path.join(config.config["data_path"], "LUNG1-097")
+process_subject_folder(subject = subject_folder, overwrite=True)
 
 #normalize_data()

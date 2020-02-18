@@ -52,6 +52,7 @@ else:
     config["validation_file"] = os.path.abspath("lung_validation_ids.pkl")
 
 config["data_path"] = "/home/sanjit/datasets/lung/"
+config["datasets"] = "/home/sanjit/datasets/"
 config["processed_data_path"] = "/home/sanjit/datasets/lidc_processed/"
 config["data_file"] = os.path.abspath("merged_lung_data_file.h5")
 config["mask_file"] = os.path.abspath("foregound_mask")

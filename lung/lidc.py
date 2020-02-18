@@ -162,7 +162,13 @@ def save_processed_img(img_data, mask_data, affine, save_path, subject_id = None
         print(e)
         shutil.rmtree(save_path)
 
-def process_subject(subject_id, overwrite = False, plot=False):
+def process_not_processed():
+    not_processed_file = os.path.abspath("notprocessed.pkl")
+    not_processed = utils.pickle_load(not_processed_file)
+    for subject in not_processed:
+        process_subject(subject, overwrite=True)
+
+def process_subject(subject_id, overwrite=False, plot=False):
     global skipped_subjects
 
     if not overwrite and subject_id in skipped_subjects:
@@ -170,7 +176,7 @@ def process_subject(subject_id, overwrite = False, plot=False):
         return
 
     background_value = 0
-    tolerance=0.00001
+    tolerance = 0.00001
     process_path = os.path.join(config.config["processed_data_path"], subject_id)
     if not overwrite and os.path.exists(process_path): 
       files = os.listdir(process_path)
@@ -193,12 +199,12 @@ def process_subject(subject_id, overwrite = False, plot=False):
         utils.pickle_dump(skipped_subjects, skipped_subjects_file)   
         print("Subject ID:", subject_id, " Does not have any mask data. Skipping process.")
         return
+    
     #segment the lung
     segmented_lung = segment_lung_from_ct_scan(data)
     if plot:
         print("Saving segmented lung")
-        dicom_util.save_img_3d(segmented_lung, "lidc_segmented_lung.png", threshold=None, do_transpose=True)
-        
+        dicom_util.save_img_3d(segmented_lung, "lidc_segmented_lung.png", threshold=None, do_transpose=True) 
 
     #Calculate the foreground mask
     for i, image in enumerate(segmented_lung): #enumerate on scan slices on each study
@@ -333,4 +339,6 @@ if __name__ == "__main__":
     #main(use_pool = True)
     #write_data_file(config.config["processed_data_path"], overwrite=True)
 
-    write_merged_data_file()
+    #write_merged_data_file()
+
+    process_not_processed()

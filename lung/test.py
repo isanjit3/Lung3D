@@ -128,7 +128,30 @@ def get_training_validation_split():
     print("Training Steps:", len(training))
     print("Validation Steps:", len(testing))
 
+def validate_processed_lidc_files():
+    skipped_subjects = []
+    skipped_subjects_file = os.path.abspath("skipped_subjects.pkl")   
+    if os.path.exists(skipped_subjects_file):
+        skipped_subjects = utils.pickle_load(skipped_subjects_file)
 
+    original = []
+    lidc_original = glob.glob(os.path.join(config.config["datasets"], "LIDC-IDRI", "*"))
+    for i in lidc_original:
+        subject = os.path.basename(i)
+        original.append(subject)
+
+    processed = []
+    lidc_processed = glob.glob(os.path.join(config.config["datasets"], "lidc_processed", "*"))
+    for i in lidc_processed:
+        subject = os.path.basename(i)
+        processed.append(subject)
+
+    not_processed = [i for i in original if i not in processed]
+    not_processed = [i for i in not_processed if i not in skipped_subjects]
+    not_processed_file = os.path.abspath("notprocessed.pkl")
+    utils.pickle_dump(not_processed, not_processed_file)
+
+    
 #-------------------------------------------------
 
 #display_img_from_hdf5(85, 50)
@@ -136,6 +159,7 @@ def get_training_validation_split():
 #process_single_subject("/home/sanjit/datasets/lung/LUNG1-172")
 #validate_npz()
 
-get_training_validation_split()
+#get_training_validation_split()
 
+validate_processed_lidc_files()
 

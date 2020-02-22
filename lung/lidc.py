@@ -17,7 +17,7 @@ from skimage.morphology import ball, disk, dilation, binary_erosion, remove_smal
 from skimage.filters import roberts, sobel
 from scipy import ndimage as ndi
 from unet3d import dicom_data_util
-import config
+from lung.config import config
 
 skipped_subjects = []
 skipped_subjects_file = os.path.abspath("skipped_subjects.pkl")
@@ -49,10 +49,7 @@ def get_segmented_lungs(im, plot=False):
     
     '''
     This funtion segments the lungs from the given 2D slice.
-    '''
-    if plot == True:
-        f, plots = plt.subplots(8, 1, figsize=(5, 40))
-    
+    '''        
     #Step 1: Convert into a binary image.     
     binary = im < 604
         
@@ -94,7 +91,9 @@ def get_segmented_lungs(im, plot=False):
 
 def segment_lung_from_ct_scan(vol):
     segmented_ct_scan = np.asarray([get_segmented_lungs(slice) for slice in vol])
-    return segmented_ct_scan
+    
+    #return segmented_ct_scan
+
     selem = ball(2)
     binary = binary_closing(segmented_ct_scan, selem)
 
@@ -122,9 +121,9 @@ def segment_lung_from_ct_scan(vol):
             index = (max((max_x - min_x), (max_y - min_y), (max_z - min_z))) / (min((max_x - min_x), (max_y - min_y) , (max_z - min_z)))
     return segmented_ct_scan
 
-def save_processed_img(img_data, mask_data, affine, save_path, subject_id = None):
+def save_processed_img(img_data, mask_data, affine, save_path, subject_id = None, plot=False):
     slice_count = img_data.shape[0]
-    img_size = config.config["image_shape"][0]
+    img_size = config["image_shape"][0]
     if slice_count < img_size:
         print("Number of slices less than ", img_size, " Skipping Subject:", subject_id)
         return
@@ -134,11 +133,11 @@ def save_processed_img(img_data, mask_data, affine, save_path, subject_id = None
     initial_index = slices_to_drop // 2
     try:  
         #Construct 256x256x256 image cube
-        print("Constructing 3D image cube and Resizing images to create ", config.config["image_shape"])
+        print("Constructing 3D image cube and Resizing images to create ", config["image_shape"])
         for b in range(0, blobs):
             #Initialize the data and mask place holder.
-            data = np.zeros(config.config["image_shape"])
-            mask = np.zeros(config.config["image_shape"])
+            data = np.zeros(config["image_shape"])
+            mask = np.zeros(config["image_shape"])
 
             start_index = initial_index + b * img_size
             for i in range(start_index, start_index + img_size):
@@ -151,6 +150,9 @@ def save_processed_img(img_data, mask_data, affine, save_path, subject_id = None
                 if (not (mask_data is None)):
                     mask[:,:,depth] = scipy.ndimage.interpolation.zoom(mask_data[i], [xscale, yscale])
 
+                if plot:
+                    dicom_util.save_img_3d(data, save_path="/lidc_resized_img.png")
+                    dicom_util.save_img_3d(mask, save_path="/lidc_resized_mask.png")
         #save it to the disk
         print("Writing Compressed file.")
         if not os.path.exists(save_path):
@@ -177,7 +179,7 @@ def process_subject(subject_id, overwrite=False, plot=False):
 
     background_value = 0
     tolerance = 0.00001
-    process_path = os.path.join(config.config["processed_data_path"], subject_id)
+    process_path = os.path.join(config["processed_data_path"], subject_id)
     if not overwrite and os.path.exists(process_path): 
       files = os.listdir(process_path)
       if (len(files) > 0):
@@ -190,9 +192,15 @@ def process_subject(subject_id, overwrite=False, plot=False):
         return
         
     if plot:
-        print("Saving original data and mask")
+        print("Saving original data and mask", subject_id)
         dicom_util.save_img_3d(data, "lidc_data.png", threshold=604, do_transpose=True)
         dicom_util.save_img_3d(mask, "lidc_mask.png", threshold=None, do_transpose=True)
+    
+    if plot:        
+        for slice_num in range(mask.shape[0]):
+            if (np.any(mask[slice_num, :, :] == 1)):
+                dicom_util.save_img((data[slice_num, :, :],), save_path="lidc_original_data_" + str(slice_num) + ".png")
+                dicom_util.save_img((mask[slice_num, :, :],), save_path="lidc_original_mask_" + str(slice_num) + ".png")
 
     if not (np.any(mask == 1)):   
         skipped_subjects.append(subject_id)  
@@ -201,10 +209,11 @@ def process_subject(subject_id, overwrite=False, plot=False):
         return
     
     #segment the lung
+    print("Segmenting lung :", subject_id)
     segmented_lung = segment_lung_from_ct_scan(data)
     if plot:
-        print("Saving segmented lung")
-        dicom_util.save_img_3d(segmented_lung, "lidc_segmented_lung.png", threshold=None, do_transpose=True) 
+        print("Saving segmented lung :", subject_id)
+        dicom_util.save_img_3d(segmented_lung, "lidc_segmented_lung.png", threshold=604, do_transpose=True) 
 
     #Calculate the foreground mask
     for i, image in enumerate(segmented_lung): #enumerate on scan slices on each study
@@ -215,25 +224,40 @@ def process_subject(subject_id, overwrite=False, plot=False):
 
       foreground[is_foreground] = 1
 
+    if plot:
+        dicom_util.save_img((foreground,), save_path="lidc_foreground_mask.png")
+
     #Crop the image based on foreground mask
     crop_slices = dicom_util.get_crop_size(foreground) 
     slice1 = crop_slices[0]
     slice2 = crop_slices[1]
 
-    cropped_lung_slices = data[:, slice1, slice2]
+    cropped_lung_slices = segmented_lung[:, slice1, slice2]
     cropped_mask = mask[:, slice1, slice2]
 
-    if plot:
-        print("Saving cropped images")
-        dicom_util.save_img_3d(cropped_lung_slices, "lidc_cropped_lung_slices.png", threshold=604, do_transpose=True)
-        dicom_util.save_img_3d(cropped_mask, "lidc_cropped_mask.png", threshold=None, do_transpose=True)
+    for m in range(mask.shape[0]):
+        mm = mask[m,:, :]
+        if (np.any(mm == 1)):
+            dicom_util.save_img((mm,), save_path="lidc_original_mask_slice_" + str(m) + ".png")
+            dicom_util.save_img((cropped_mask[m, :, :],), save_path="lidc_cropped_mask_slice_" + str(m) + ".png")
+            dicom_util.save_img((data[m, :, :],), save_path="lidc_original_slice_" + str(m) + ".png")
+            dicom_util.save_img((segmented_lung[m, :, :],), save_path="lidc_segmented_slice_" + str(m) + ".png")
+            dicom_util.save_img((cropped_lung_slices[m, :, :],), save_path="lidc_cropped_slice_" + str(m) + ".png")
 
-    cropped_lung_slices = cropped_lung_slices.astype(np.float32)
+
+    if plot:
+        print("Saving cropped images - ", subject_id)
+        dicom_util.save_img_3d(cropped_lung_slices, "lidc_cropped_lung_slices.png", threshold=604, do_transpose=True)
+        if np.any((cropped_mask == 1)):
+            dicom_util.save_img_3d(cropped_mask, "lidc_cropped_mask.png", threshold=None, do_transpose=True)
+
+
+    #cropped_lung_slices = cropped_lung_slices.astype(np.float32)
     for i in range(cropped_lung_slices.shape[0]):    
         cropped_lung_slices[i] = dicom_util.normalize(image = cropped_lung_slices[i], min_bound = 0, max_bound = 1000)
     
     # Determine current pixel spacing and reslice images to 1m3 voxels
-    print("Reslicing the scan image and mask")
+    print("Reslicing the scan image and mask - ", subject_id)
     spacing = np.array([scan.slice_thickness, scan.pixel_spacing, scan.pixel_spacing], dtype=np.float32)
     cropped_lung_slices = dicom_util.reslice_image(cropped_lung_slices, spacing)
     cropped_mask = dicom_util.reslice_image(cropped_mask, spacing)
@@ -244,9 +268,9 @@ def process_subject(subject_id, overwrite=False, plot=False):
         dicom_util.save_img_3d(cropped_mask, "lidc_re-sliced_mask.png", threshold=None, do_transpose=True)
 
     #save the image cubes to disk
-    print("Saving the processed image")
+    print("Saving the processed image - ", subject_id)
     affine = np.zeros((4,4), np.float32)
-    save_processed_img(cropped_lung_slices, cropped_mask, affine, os.path.join(config.config["processed_data_path"], subject_id), "uknown")
+    save_processed_img(cropped_lung_slices, cropped_mask, affine, os.path.join(config["processed_data_path"], subject_id), "uknown", plot)
   
 def prepreocess_lidc_data(use_pool = False, overwrite=False):
     #Get all the subjects
@@ -271,7 +295,7 @@ def write_data_file(processed_folder, overwrite=False):
   samples = glob.glob(os.path.join(processed_folder, "*", "scan.*"))
   print("Number of samples found", len(samples))
 
-  dicom_data_util.write_data_to_file(samples, config.config["data_file"], config.config["image_shape"])
+  dicom_data_util.write_data_to_file(samples, config["data_file"], config["image_shape"])
 
 def write_merged_data_file():
     processed_folder = "/home/sanjit/datasets/lidc_processed/"
@@ -285,11 +309,11 @@ def write_merged_data_file():
     samples = lidc_data + nsclc_data
     print(len(samples))
     data_file = os.path.abspath("merged_lung_data_file.h5")
-    dicom_data_util.write_data_to_file(samples, data_file, config.config["image_shape"])
+    dicom_data_util.write_data_to_file(samples, data_file, config["image_shape"])
 
 
 def remove_empty_processed_dir():
-    path = os.path.join(config.config["processed_data_path"], "*")
+    path = os.path.join(config["processed_data_path"], "*")
     files = glob.glob(path)
     for i, f in enumerate(files):
         files = os.listdir(f)
@@ -299,14 +323,12 @@ def remove_empty_processed_dir():
 
 def main(use_pool = False):
     global skipped_subjects
-    #pid = "LIDC-IDRI-0008"    
+       
     if os.path.exists(skipped_subjects_file):
         skipped_subjects = utils.pickle_load(skipped_subjects_file)
 
-    prepreocess_lidc_data(use_pool=use_pool)
-    
-    #process_subject(pid, overwrite=True, plot=True)
-    
+    #prepreocess_lidc_data(use_pool=use_pool)
+    process_subject('LIDC-IDRI-0467', overwrite=True, plot=True)
     return
     
     scan = pl.query(pl.Scan).filter(pl.Scan.patient_id == pid).first()
@@ -336,9 +358,10 @@ def main(use_pool = False):
 
 if __name__ == "__main__":
     #remove_empty_processed_dir()
-    #main(use_pool = True)
-    #write_data_file(config.config["processed_data_path"], overwrite=True)
+    main(use_pool = False)
+    #write_data_file(config["processed_data_path"], overwrite=True)
 
     #write_merged_data_file()
 
-    process_not_processed()
+    #process_not_processed()
+    #process_subject("LIDC-IDRI-0008", overwrite=True, plot=True)

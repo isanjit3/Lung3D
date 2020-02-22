@@ -129,7 +129,7 @@ def run_validation_case(data_index, output_dir, model, data_file, training_modal
         prediction = patch_wise_prediction(model=model, data=test_data, overlap=overlap, permute=permute)[np.newaxis]
 
     pred = prediction[0][0]
-    pred[pred<0.75] = 0
+    pred[pred<0.9] = 0
     cancer_truth = np.any(truth_data[0][0]) > 0
     cancer_pred = np.any(pred) > 0
     if cancer_pred > 0 and cancer_truth:
@@ -143,12 +143,12 @@ def run_validation_case(data_index, output_dir, model, data_file, training_modal
         for j in range(0, prediction[i].shape[0]): #Number of channels in the data file.
             for k in range(0, prediction[i][j].shape[2]): # Number of slices in the data file.
                 file_name = f'{k:06}_prediction.png'
-                if np.any(truth_data[i, j, :, :, k]) > 0:
+                if np.any(truth_data[i, j, :, :, k]) >= 0:
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
 
                     predicted_image = prediction[i, j, :, :, k]
-                    predicted_image[predicted_image < 0.5] = 0
+                    predicted_image[predicted_image < 0.9] = 0
                     dicom_util.save_img(img_arr = (test_data[i, j, :, :, k], 
                                                     truth_data[i, j, :, :, k], 
                                                     prediction[i, j, :, :, k]

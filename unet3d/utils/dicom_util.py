@@ -8,7 +8,7 @@ import dicom_contour.contour as dcm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from lung import config
+from lung.config import config
 
 import skimage
 from skimage.morphology import ball, disk, dilation, binary_erosion, remove_small_objects, erosion, closing, reconstruction, binary_closing
@@ -32,7 +32,7 @@ def parse_dicom_file(fileName):
 
         # Convert to int16 (from sometimes int16), 
         # should be possible as values should always be low enough (<32k)
-        dcm_image = dcm_image.astype(np.int16)
+        dcm_image = dcm_image.astype(np.float64)
 
         # Set outside-of-scan pixels to 0
         # The intercept is usually -1024, so air is approximately 0
@@ -49,16 +49,51 @@ def parse_dicom_file(fileName):
             slope = 0.0
         
         if slope != 1:
-            dcm_image = slope * dcm_image.astype(np.float64)
-            dcm_image = dcm_image.astype(np.int16)   
+            dcm_image = slope * dcm_image             
 
         if intercept != 0:         
             dcm_image += np.int16(intercept)
 
-        return np.array(dcm_image, dtype=np.int16)
+        return dcm_image
 
     except:
         return None
+
+def get_scan_image_data(path):
+    slices = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
+    slices.sort(key = lambda x: float(x.ImagePositionPatient[2])) #Sort the image slices based on image position
+    try:
+        slice_thickness = np.abs(slices[0].ImagePositionPatient[2] - slices[1].ImagePositionPatient[2])
+    except:
+        slice_thickness = np.abs(slices[0].SliceLocation - slices[1].SliceLocation)
+            
+    for s in slices:
+        s.SliceThickness = slice_thickness
+
+    img_voxels = np.stack([s.pixel_array for s in slices])
+    img_voxels = img_voxels.astype(np.float32)
+
+    # Set outside-of-scan pixels to 0
+    # The intercept is usually -1024, so air is approximately 0
+    img_voxels[img_voxels == -2000] = 0
+
+    try:
+        intercept = slices[0].RescaleIntercept        
+    except AttributeError:        
+        intercept = 0.0
+
+    try:
+        slope = slices[0].RescaleSlope        
+    except AttributeError:        
+        slope = 0.0
+    
+    if slope != 1:
+        img_voxels = slope * img_voxels        
+
+    if intercept != 0:         
+        img_voxels += np.int16(intercept)
+
+    return img_voxels
 
 def get_roi_contour_ds(rt_sequence, index):
     """
@@ -529,6 +564,83 @@ def segment_lung_mask(image, fill_lung_structures=True):
         binary_image[labels != l_max] = 0
  
     return binary_image
+
+def get_segmented_lungs(im):
+    
+    '''
+    This funtion segments the lungs from the given 2D slice.
+    '''        
+    #Step 1: Convert into a binary image.     
+    binary = im < 604
+        
+    #Step 2: Remove the blobs connected to the border of the image.    
+    cleared = clear_border(binary)
+    
+    #Step 3: Label the image.    
+    label_image = label(cleared)
+    
+    #Step 4: Keep the labels with 2 largest areas.    
+    areas = [r.area for r in regionprops(label_image)]
+    areas.sort()
+    if len(areas) > 2:
+        for region in regionprops(label_image):
+            if region.area < areas[-2]:
+                for coordinates in region.coords:                
+                       label_image[coordinates[0], coordinates[1]] = 0
+    binary = label_image > 0
+   
+    #Step 5: Erosion operation with a disk of radius 2. This operation is 
+    #seperate the lung nodules attached to the blood vessels.    
+    selem = disk(2)
+    binary = binary_erosion(binary, selem)
+    
+    #Step 6: Closure operation with a disk of radius 10. This operation is 
+    #to keep nodules attached to the lung wall.    
+    selem = disk(10)
+    binary = binary_closing(binary, selem)
+    
+    #Step 7: Fill in the small holes inside the binary mask of lungs.    
+    edges = roberts(binary)
+    binary = ndi.binary_fill_holes(edges)
+    
+    #Step 8: Superimpose the binary mask on the input image.    
+    get_high_vals = binary == 0
+    im[get_high_vals] = 0
+    
+    return im
+
+def segment_lung_from_ct_scan(vol):
+    segmented_ct_scan = np.asarray([get_segmented_lungs(slice) for slice in vol])
+    
+    #return segmented_ct_scan
+
+    selem = ball(2)
+    binary = binary_closing(segmented_ct_scan, selem)
+
+    label_scan = label(binary)
+
+    areas = [r.area for r in regionprops(label_scan)]
+    areas.sort()
+
+    for r in regionprops(label_scan):
+        max_x, max_y, max_z = 0, 0, 0
+        min_x, min_y, min_z = 1000, 1000, 1000
+        
+        for c in r.coords:
+            max_z = max(c[0], max_z)
+            max_y = max(c[1], max_y)
+            max_x = max(c[2], max_x)
+            
+            min_z = min(c[0], min_z)
+            min_y = min(c[1], min_y)
+            min_x = min(c[2], min_x)
+        if (min_z == max_z or min_y == max_y or min_x == max_x or r.area > areas[-3]):
+            for c in r.coords:
+                segmented_ct_scan[c[0], c[1], c[2]] = 0
+        else:
+            index = (max((max_x - min_x), (max_y - min_y), (max_z - min_z))) / (min((max_x - min_x), (max_y - min_y) , (max_z - min_z)))
+    return segmented_ct_scan
+
 
 def save_img_3d(image, save_path, threshold=None, do_transpose=False):
     

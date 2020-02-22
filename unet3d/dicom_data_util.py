@@ -7,7 +7,7 @@ from .normalize import normalize_data_storage, reslice_image_set
 
 from unet3d import dicom_data_util
 from unet3d.utils import dicom_util
-import config
+from lung.config import config
 
 def get_study_images(study_folders, load_tumor_only_slices = True):  
   x=[]

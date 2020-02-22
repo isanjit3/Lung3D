@@ -23,12 +23,11 @@ else:
 
 #config["input_shape"] = tuple([1] + list(config["image_shape"]) )
 config["truth_channel"] = 1
-config["deconvolution"] = True  # if False, will use upsampling instead of deconvolut
-
+config["deconvolution"] = True  # if False, will use upsampling instead of deconvolution
 config["pool_size"] = (2, 2, 2)  # pool size for the max pooling operations
 config["batch_size"] = 2
 config["validation_batch_size"] = 2
-config["n_epochs"] = 500  # cutoff the training after this many epochs
+config["n_epochs"] = 10  # cutoff the training after this many epochs
 config["patience"] = 10  # learning rate will be reduced after this many epochs if the validation loss is not improving
 config["early_stop"] = 50  # training will be stopped after this many epochs without the validation loss improving
 config["initial_learning_rate"] = 0.00001
@@ -53,8 +52,8 @@ else:
 
 config["data_path"] = "/home/sanjit/datasets/lung/"
 config["datasets"] = "/home/sanjit/datasets/"
-config["processed_data_path"] = "/home/sanjit/datasets/lidc_processed/"
-config["data_file"] = os.path.abspath("merged_lung_data_file.h5")
+config["processed_data_path"] = "/home/sanjit/datasets/lung_processed/"
+config["data_file"] = os.path.abspath("lung_data_file.h5")
 config["mask_file"] = os.path.abspath("foregound_mask")
 config["mask_file_img"] = os.path.abspath("foregound_mask.png")
 config["segmented_lung_img"] = os.path.abspath("segmented_lung_img.png")
